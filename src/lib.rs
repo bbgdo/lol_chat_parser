@@ -61,7 +61,7 @@ pub struct SystemLine {
 pub struct ParsedLog {
     pub players: Vec<PlayerSummary>,
     pub kills: Vec<KillEvent>,
-    pub objectives: Vec<ObjectiveEvent>,
+    pub events: Vec<ObjectiveEvent>,
     pub messages: Vec<ChatMessage>,
     pub system: Vec<SystemLine>,
 }
@@ -100,7 +100,7 @@ fn parse_time_and_rest(line: &str) -> Result<(String, String)> {
 pub fn parse_log(input: &str) -> ParsedLog {
     let mut players: HashMap<String, HashSet<String>> = HashMap::new();
     let mut kills = Vec::new();
-    let mut objectives = Vec::new();
+    let mut events = Vec::new();
     let mut messages = Vec::new();
     let mut system = Vec::new();
 
@@ -144,7 +144,7 @@ pub fn parse_log(input: &str) -> ParsedLog {
                 add_player(&mut players, &target_player, &target_champion);
             }
 
-            objectives.push(obj);
+            events.push(obj);
             continue;
         }
 
@@ -170,7 +170,7 @@ pub fn parse_log(input: &str) -> ParsedLog {
     ParsedLog {
         players: players_vec,
         kills,
-        objectives,
+        events,
         messages,
         system,
     }
