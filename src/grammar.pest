@@ -1,3 +1,208 @@
-line = { time ~ rest }
+// Root rule: one timestamped log line.
+//
+// Example:
+//   17:34 [Team] kozakSyla (Lux): hi in team chat
+//   13:05 Golf4f (Mel) has shut down BorysBulba (Tahm Kench)! (Bonus Bounty: 149G)
+line = { time ~ " " ~ line_body }
+
+//   Example: 13:05
 time = @{ ASCII_DIGIT ~ ASCII_DIGIT ~ ":" ~ ASCII_DIGIT ~ ASCII_DIGIT }
-rest = _{ (!EOI ~ ANY)* }
+
+line_body = {
+      chat_message
+    | kill_shutdown_event
+    | kill_first_blood_event
+    | team_feat_event
+    | purchase_event
+    | target_player_event
+    | target_objective_event
+    | rampage_event
+    | ping_on_the_way_event
+    | generic_player_event
+    | generic_text
+}
+
+//  -- Common lexical elements --
+
+// Player name: alphanumeric + underscore + hyphen + apostrophe, no spaces.
+player_name = @{ (ASCII_ALPHANUMERIC | "_" | "-" | "'")+ }
+
+// Word token used in champions, items, objectives (allows apostrophes).
+word = @{ (ASCII_ALPHANUMERIC | "'")+ }
+
+// Champion name: one or more words separated by space.
+// Examples: "Lux", "Yone", "Tahm Kench", "Cho'Gath"
+champion_name = @{
+    word ~ ( " " ~ word )*
+}
+
+// Player with champion in parentheses:
+//   piwkobb (Yone)
+player_with_champion = {
+    player_name ~ " " ~ "(" ~ champion_name ~ ")"
+}
+
+channel_tag = {
+      "[All]"
+    | "[Team]"
+    | "[Party]"
+}
+
+number = @{ ASCII_DIGIT+ }
+
+percentage = @{ ASCII_DIGIT+ }
+
+// Item / objective names: one or more words.
+// Examples: "Control Ward", "Feat of Warfare", "Power Flower"
+name_phrase = @{
+    word ~ ( " " ~ word )*
+}
+
+//  -- Chat lines --
+
+// Any chat message: with or without an explicit channel tag.
+chat_message = {
+      channel_chat_message
+    | bare_chat_message
+}
+
+// Chat with explicit channel, e.g.:
+//   [All] piwkobb (Yone): hello this is all chat msg
+//   [Team] kozakSyla (Lux): hi in team chat
+//   [Party] piwkobb (Yone): Cho'Gath Heartsteel - 20 charges
+channel_chat_message = {
+    channel_tag ~ " " ~ player_with_champion ~ ": " ~ chat_text
+}
+
+// Chat without a channel tag, e.g.:
+//   uskin432 (Warwick): some text
+bare_chat_message = {
+    player_with_champion ~ ": " ~ chat_text
+}
+
+// Chat text: everything until the end of the line.
+chat_text = { (!EOI ~ ANY)* }
+
+//  -- Events: kills, streaks, pings, etc. --
+
+// First blood event:
+//   kozakSyla (Lux) has drawn first blood!
+kill_first_blood_event = {
+    player_with_champion ~ " has drawn first blood!"
+}
+
+// Shutdown with bonus bounty, e.g.:
+//   Golf4f (Mel) has shut down BorysBulba (Tahm Kench)! (Bonus Bounty: 149G)
+kill_shutdown_event = {
+    player_with_champion
+    ~ " has shut down "
+    ~ player_with_champion
+    ~ "!"
+    ~ " "
+    ~ shutdown_bounty
+}
+
+// Bonus bounty section:
+//   (Bonus Bounty: 149G)
+shutdown_bounty = {
+    "("
+    ~ "Bonus Bounty:"
+    ~ " "
+    ~ number
+    ~ "G"
+    ~ ")"
+}
+
+
+// Feat of Warfare-style objective:
+//   Enemy team has completed the Feat of Warfare!
+team_feat_event = {
+    team_name
+    ~ " has completed the "
+    ~ name_phrase
+    ~ "!"
+}
+
+// Team name: extendable for other cases if needed.
+team_name = @{
+      "Enemy team"
+    | "Ally team"
+    | "Blue team"
+    | "Red team"
+}
+
+
+// Purchase event:
+//   BorysBulba (Tahm Kench) purchased Control Ward
+purchase_event = {
+    player_with_champion
+    ~ " purchased "
+    ~ name_phrase
+}
+
+// Target another player:
+//   piwkobb (Yone) has targeted TheMiozl - (Renekton)
+target_player_event = {
+    player_with_champion
+    ~ " has targeted "
+    ~ player_name
+    ~ " - "
+    ~ "("
+    ~ champion_name
+    ~ ")"
+}
+
+// Target an objective with percentage:
+//   kozakSyla (Lux) has targeted the Power Flower (33%)
+target_objective_event = {
+    player_with_champion
+    ~ " has targeted "
+    ~ name_phrase
+    ~ " "
+    ~ "("
+    ~ percentage
+    ~ "%)"
+}
+
+// Rampage / streak event:
+//   kozakSyla (Lux) is on rampage!
+rampage_event = {
+    player_with_champion
+    ~ " is on rampage!"
+}
+
+// "On the way" ping-like event:
+//   uskin432 (Warwick) is on the way
+ping_on_the_way_event = {
+    player_with_champion
+    ~ " "
+    ~ ping_phrase
+}
+
+ping_phrase = {
+      "is on the way"
+    | "is missing"
+    | "is retreating"
+    | "is in danger"
+    | "needs vision"
+}
+
+//  -- Generic things (Fallbacks) --
+
+// Fallback: any line that starts with `player (champ)` but doesn't match
+// more specific patterns above.
+//   Example: piwkobb (Yone) has done something unusual
+generic_player_event = {
+    player_with_champion
+    ~ " "
+    ~ generic_tail
+}
+
+generic_tail = { (!EOI ~ ANY)* }
+
+
+// Fallback for any other line after the timestamp,
+// when no specific event / chat has been recognised.
+//
+// Example: future event types, or text that doesn't match patterns above.
+generic_text = { (!EOI ~ ANY)* }
