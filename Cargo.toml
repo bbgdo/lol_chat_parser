@@ -1,6 +1,6 @@
 [package]
 name = "lol_chat_parser"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 description = "A parser for League of Legends chat logs that extracts structured data into JSON."
